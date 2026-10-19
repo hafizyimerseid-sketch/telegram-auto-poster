@@ -3,87 +3,65 @@ import time
 import threading
 import requests
 from flask import Flask
-from telethon import TelegramClient, events
 
 app = Flask(__name__)
 
-# --- Environment Variables (በ Render ላይ የሚሞሉ) ---
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")      # የርስዎ ቦት Token (ከ BotFather)
-MY_CHANNEL_ID = os.environ.get("MY_CHANNEL_ID")                # የእርስዎ ቻናል ID ወይም Username (ለምሳሌ: @mychannel)
-API_ID = int(os.environ.get("API_ID", 0))                      # ከ my.telegram.org የሚገኝ API ID
-API_HASH = os.environ.get("API_HASH", "")                       # ከ my.telegram.org የሚገኝ API HASH
-
-# Source Channels / Pages
-TELEGRAM_SOURCE = "yesakbet01"
-FACEBOOK_SOURCE_URL = "https://www.facebook.com/InfoZer12"
+# Config - Environment Variables
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+MY_CHANNEL_ID = os.environ.get("MY_CHANNEL_ID")
 
 @app.route('/')
 def home():
-    return "Facebook & Telegram Auto-Poster Bot is Running Live 24/7!"
+    return "Telegram Auto-Poster Bot is Active and Live 24/7!"
 
-# ----------------------------------------------------
-# 1. Telegram-to-Telegram Forwarder (Telethon)
-# ----------------------------------------------------
-client = TelegramClient('anon_session', API_ID, API_HASH)
-
-@client.on(events.NewMessage(chats=TELEGRAM_SOURCE))
-async def my_event_handler(event):
-    """ከ @yesakbet01 አዲስ መልእክት ሲወጣ ወዲያውኑ ወደ እርስዎ ቻናል የሚልክ"""
+def send_telegram_post(text):
+    """ወደ ቴሌግራም ቻናልዎ መረጃ የሚልክ ተግባር"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": MY_CHANNEL_ID,
+        "text": text,
+        "parse_mode": "Markdown"
+    }
     try:
-        print(f"[Telegram Source] አዲስ ፖስት ከ @{TELEGRAM_SOURCE} ተገኝቷል!")
-        await client.send_message(MY_CHANNEL_ID, event.message)
-        print("[Success] ወደ እርስዎ ቻናል በስኬት ተፖስቷል!")
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            print("[Auto-Poster] መልእክቱ/ማስታወቂያው በስኬት ተፖስቷል!")
+        else:
+            print(f"[Auto-Poster Error]: {response.text}")
     except Exception as e:
-        print(f"[Telegram Forward Error]: {e}")
+        print(f"[Exception]: {e}")
 
-def run_telegram_listener():
-    client.start()
-    client.run_until_disconnected()
-
-# ----------------------------------------------------
-# 2. Facebook-to-Telegram Auto-Poster (Scraper)
-# ----------------------------------------------------
-last_fb_post_text = ""
-
-def check_facebook_posts():
-    global last_fb_post_text
-    print(f"[Facebook Monitor] {FACEBOOK_SOURCE_URL} ን በመፈተሽ ላይ...")
+def auto_poster_loop():
+    """በየተወሰነ ሰዓቱ አውቶማቲክ ፖስት የሚያደርግ ሉፕ"""
+    print("=== Auto-Poster Loop Started ===")
     
+    posts = [
+        "📢 *ማስታወቂያ:* ወደ እኛ የቴሌግራም ቻናል እንኳን ደህና መጡ! አዳዲስ የትሬዲንግ መረጃዎች እዚህ ይለቀቃሉ።",
+        "💡 *የቀኑ ማስታወሻ:* በትሬዲንግ ወቅት ስሜትን መቆጣጠር እና Risk Management መጠቀም አስፈላጊ ነው!",
+        "📊 *Exness Auto-Trading Bot:* አውቶማቲክ የትሬዲንግ ቦታችን 24/7 ገበያውን በመከታተል ላይ ይገኛል!"
+    ]
+    
+    index = 0
     while True:
         try:
-            # ፌስቡክን ለመቃኘት የሚረዳ ጥያቄ
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
-            }
-            response = requests.get(FACEBOOK_SOURCE_URL, headers=headers)
+            current_post = posts[index % len(posts)]
+            send_telegram_post(current_post)
             
-            if response.status_code == 200:
-                # እዚህ ጋር አዳዲስ ጽሁፎች መኖራቸውን ማረጋገጥ
-                # (አዲስ ፖስት ከተገኘ እና ከቀደመው የተለየ ከሆነ ወደ ቴሌግራም ይልካል)
-                pass
-                
+            index += 1
+            # በየ 2 ሰዓቱ (7200 ሰከንድ) ይፖስታል
+            time.sleep(7200) 
+            
         except Exception as e:
-            print(f"[Facebook Scraper Error]: {e}")
-            
-        # በየ 15 ደቂቃው (900 ሰከንድ) ፌስቡክን ይፈትሻል
-        time.sleep(900)
+            print(f"Error in Auto-Poster loop: {e}")
+            time.sleep(60)
 
-# ----------------------------------------------------
-# 3. Main Startup
-# ----------------------------------------------------
 if __name__ == '__main__':
-    # A. Telegram Listener Thread
-    if API_ID and API_HASH:
-        tg_thread = threading.Thread(target=run_telegram_listener)
-        tg_thread.daemon = True
-        tg_thread.start()
+    # 1. Auto-Poster thread
+    poster_thread = threading.Thread(target=auto_poster_loop)
+    poster_thread.daemon = True
+    poster_thread.start()
 
-    # B. Facebook Scraper Thread
-    fb_thread = threading.Thread(target=check_facebook_posts)
-    fb_thread.daemon = True
-    fb_thread.start()
-
-    # C. Render Web Server
+    # 2. Render Web Server
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
-      
+    
