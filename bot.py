@@ -6,53 +6,39 @@ from flask import Flask
 
 app = Flask(__name__)
 
-# Render Environment Variables
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 
-# የሚፖስቱ ማስታወቂያዎች/መልእክቶች
-MESSAGES = [
-    "📢 እንኳን ወደ ቻናላችን በሰላም መጡ! አዳዲስ መረጃዎችን እዚህ ያገኛሉ።",
-    "💡 በየቀኑ የሚወጡ አዳዲስ የገበያ መረጃዎችን እና ትንተናዎችን ይከታተሉ።",
-    "🚀 ስለተከታተሉን እናመሰግናለን!"
-]
-
 @app.route('/')
 def home():
-    return "Telegram Auto-Poster Bot is Fully Active!"
+    return "Bot Testing Status Page"
 
-def post_messages():
-    print("=== Telegram Auto-Poster Loop Started ===")
-    index = 0
-    while True:
+def test_telegram_connection():
+    time.sleep(5)  # ሰርቨሩ በበራ በ 5 ሰከንድ ውስጥ ይሞክራል
+    print("=== STARTING DIRECT TELEGRAM TEST ===")
+    print(f"Checking BOT_TOKEN: {BOT_TOKEN[:5] if BOT_TOKEN else 'MISSING'}")
+    print(f"Checking CHAT_ID: {CHAT_ID}")
+    
+    if BOT_TOKEN and CHAT_ID:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": CHAT_ID,
+            "text": "🚨 የሙከራ መልእክት፡ ቦቱ አሁን በ Render ላይ በስኬት እየሰራ ነው!"
+        }
+        
         try:
-            if BOT_TOKEN and CHAT_ID:
-                text = MESSAGES[index % len(MESSAGES)]
-                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                payload = {"chat_id": CHAT_ID, "text": text}
-                
-                response = requests.post(url, json=payload)
-                if response.status_code == 200:
-                    print(f"[Auto-Poster] መልእክቱ ተፖስቷል: {text}")
-                else:
-                    print(f"[Auto-Poster Error] መፖስት አልተቻለም: {response.text}")
-            else:
-                print("[Warning] BOT_TOKEN ወይም CHAT_ID በ Render ላይ አልተሞላም!")
-
-            index += 1
+            res = requests.post(url, json=payload)
+            print(f"Telegram API Response Code: {res.status_code}")
+            print(f"Telegram API Response Text: {res.text}")
         except Exception as e:
-            print(f"[Exception Error]: {e}")
-
-        # በየ 2 ሰዓቱ (7200 ሰከንድ) ማስታወቂያ ይፖስታል
-        time.sleep(7200)
+            print(f"Network Error: {e}")
+    else:
+        print("ERROR: BOT_TOKEN ወይም CHAT_ID በ Render Environment Variables ላይ አልተሞላም!")
 
 if __name__ == '__main__':
-    # Threading
-    t = threading.Thread(target=post_messages)
+    t = threading.Thread(target=test_telegram_connection)
     t.daemon = True
     t.start()
 
-    # Flask Server for Render
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
-    
